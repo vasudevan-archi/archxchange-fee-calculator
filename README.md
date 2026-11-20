@@ -2,6 +2,16 @@
 
 A single page that works out an architect's fee from the COA minimum fee scale. Plain HTML, CSS and JavaScript: no build step and no installs. Open `index.html` in a browser, or serve the folder.
 
+**Live:** https://vasudevan-archi.github.io/archxchange-fee-calculator/ (GitHub Pages, repository `vasudevan-archi/archxchange-fee-calculator`, public).
+
+To publish a change, run `node test.js`, then commit and push from this folder. Pages rebuilds in about a minute.
+
+```
+git add -A
+git commit -m "Describe the change"
+git push
+```
+
 ## Files
 
 | File | What it holds | Edit it to |

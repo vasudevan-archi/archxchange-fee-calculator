@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fee Calculator · ArchXchange</title>
+<meta name="description" content="Price your architecture work on the Council of Architecture minimum fee scale, see what architects at your level charge, and check whether you're undercharging.">
+<meta name="theme-color" content="#08090C">
+<link rel="icon" href="ax-mark.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400..700&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link href="style.css" rel="stylesheet">
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="top">
+	<div class="wrap top-in">
+		<a class="brand" href="./"><img src="ax-mark.svg" alt="" width="26" height="26"><span>ARCH<b>X</b>CHANGE</span></a>
+		<span class="pill"><i></i>COA scale · verified</span>
+	</div>
+	<nav class="stepnav" aria-label="Sections">
+		<div class="wrap stepnav-in">
+			<a href="#calc" data-sec="calc"><i>1</i>Calculate</a>
+			<a href="#rate" data-sec="rate"><i>2</i>Your rate</a>
+			<a href="#send" data-sec="send"><i>3</i>Send to client</a>
+		</div>
+	</nav>
+</header>
+
+<main class="wrap">
+	<section class="hero">
+		<h1>Price your work.<br><span class="grad">Never below COA.</span></h1>
+		<p>Your fee starts from the Council of Architecture minimum, read straight from the COA scale. Then we add what architects at your level, in your city, really charge, and tell you if you're undercharging.</p>
+		<ol class="how">
+			<li><b>Calculate</b> your fee in seven quick answers</li>
+			<li><b>Check your rate</b> against COA and your peers</li>
+			<li><b>Send it</b> to your client on WhatsApp or as a PDF proposal</li>
+		</ol>
+	</section>
+
+	<div class="layout">
+		<form id="form" class="steps" novalidate autocomplete="off">
+			<section class="step" id="calc">
+				<h2><span class="n">01</span>Service</h2>
+				<div class="opts two" id="services"></div>
+			</section>
+
+			<section class="step" id="q-category">
+				<h2><span class="n">02</span>Building <small>COA Tables 1 & 2</small></h2>
+				<select id="category" class="select"></select>
+			</section>
+
+			<section class="step" id="q-discipline" hidden>
+				<h2><span class="n">02</span>Discipline <small>COA Table 3</small></h2>
+				<select id="discipline" class="select"></select>
+			</section>
+
+			<section class="step">
+				<h2><span class="n">03</span>Complexity</h2>
+				<div class="toggle" role="radiogroup" aria-label="Complexity">
+					<label><input type="radio" name="complexity" value="simple" checked><span>Simple</span></label>
+					<label><input type="radio" name="complexity" value="complex"><span>Complex</span></label>
+				</div>
+				<details class="more">
+					<summary>How COA defines it</summary>
+					<p><b>Simple.</b> <span id="def-simple"></span></p>
+					<p><b>Complex.</b> <span id="def-complex"></span></p>
+				</details>
+			</section>
+
+			<section class="step">
+				<h2><span class="n">04</span>Project cost</h2>
+				<div class="toggle" role="radiogroup" aria-label="How to enter the cost">
+					<label><input type="radio" name="method" value="area" checked><span>Area × rate</span></label>
+					<label><input type="radio" name="method" value="total"><span>Total cost</span></label>
+				</div>
+				<div class="fields">
+					<label class="field" id="f-area">
+						<span class="label" id="area-label">Built-up area, all floors</span>
+						<span class="input-wrap"><input id="area" class="input" type="number" inputmode="decimal" min="0" step="any" placeholder="3000"><em>sq.ft</em></span>
+					</label>
+					<div class="field" id="f-build">
+						<span class="label" id="build-label">Construction cost</span>
+						<span class="input-wrap" data-method="area"><em>₹</em><input id="buildRate" class="input" type="number" inputmode="decimal" min="0" step="any" placeholder="3500" aria-labelledby="build-label"><em>/sq.ft</em></span>
+						<span class="input-wrap" data-method="total"><em>₹</em><input id="buildTotal" class="input" type="number" inputmode="decimal" min="0" step="any" placeholder="10500000" aria-labelledby="build-label"></span>
+						<span class="echo" id="build-echo"></span>
+					</div>
+					<div class="field" id="f-interior">
+						<span class="label" id="interior-label">Interior fit-out cost</span>
+						<span class="input-wrap" data-method="area"><em>₹</em><input id="interiorRate" class="input" type="number" inputmode="decimal" min="0" step="any" placeholder="1500" aria-labelledby="interior-label"><em>/sq.ft</em></span>
+						<span class="input-wrap" data-method="total"><em>₹</em><input id="interiorTotal" class="input" type="number" inputmode="decimal" min="0" step="any" placeholder="4500000" aria-labelledby="interior-label"></span>
+						<span class="echo" id="interior-echo"></span>
+					</div>
+				</div>
+				<details class="more">
+					<summary>What the construction cost leaves out</summary>
+					<ul id="excludes"></ul>
+				</details>
+			</section>
+
+			<section class="step">
+				<h2><span class="n">05</span>Your experience</h2>
+				<div class="opts two" id="experience"></div>
+				<label class="field" id="f-custom" hidden>
+					<span class="label">Your premium above COA</span>
+					<span class="input-wrap short"><em>+</em><input id="premium" class="input" type="number" inputmode="decimal" min="0" step="any" value="0"><em>%</em></span>
+				</label>
+			</section>
+
+			<section class="step">
+				<h2><span class="n">06</span>Where is the project?</h2>
+				<div class="opts" id="cities"></div>
+			</section>
+
+			<section class="step accent" id="rate">
+				<h2><span class="n">07</span>What do you charge today?</h2>
+				<p class="sub">Tell us your usual rate. We'll show you how it compares with COA and with architects like you.</p>
+				<div class="toggle three" role="radiogroup" aria-label="How you charge">
+					<label><input type="radio" name="cur" value="sqft" checked><span>₹ per sq.ft</span></label>
+					<label><input type="radio" name="cur" value="pct"><span>% of cost</span></label>
+					<label><input type="radio" name="cur" value="total"><span>Lump sum</span></label>
+				</div>
+				<label class="field">
+					<span class="input-wrap"><em id="cur-pre">₹</em><input id="current" class="input" type="number" inputmode="decimal" min="0" step="any" placeholder="200" aria-label="What you charge today"><em id="cur-post">/sq.ft</em></span>
+					<span class="echo" id="cur-echo"></span>
+				</label>
+			</section>
+
+			<details class="step more-step">
+				<summary><span class="n">08</span>Repeated blocks and GST</summary>
+				<label class="field">
+					<span class="label">Repeated identical blocks, beyond the first</span>
+					<input id="repeats" class="input" type="number" inputmode="numeric" min="0" step="1" value="0">
+					<span class="sub">Enter the cost of all blocks above. COA: repeats 1–3 at 50% of the fee each, 4–6 at 30%, beyond 6 at 20%. Applies to Tables 1 and 2.</span>
+				</label>
+				<label class="check"><input id="gst" type="checkbox" checked><span>Add GST at 18%</span></label>
+			</details>
+		</form>
+
+		<aside class="panel" id="result" aria-live="polite">
+			<div class="glass" id="card">
+				<p class="empty" id="empty">Enter the project cost to see your fee.</p>
+				<div class="error" id="errors" hidden></div>
+				<div id="out" hidden>
+					<span class="k">Quote this fee</span>
+					<div class="hero-fee num" id="fee"></div>
+					<p class="fee-sub" id="fee-sub"></p>
+					<div class="peers" id="peers"></div>
+
+					<div class="check-box" id="compare" hidden></div>
+
+					<div class="coa">
+						<div class="coa-head"><span class="k">COA minimum fee</span><b class="num" id="coaFee"></b></div>
+						<div id="lines"></div>
+					</div>
+
+					<div class="rows" id="rows"></div>
+				</div>
+			</div>
+
+			<section class="glass send" id="send">
+				<h2><span class="n">3</span>Send to your client</h2>
+				<p class="sub">Optional: add names and they appear on the message and the PDF. Saved on this device for next time.</p>
+				<div class="send-fields">
+					<label class="field"><span class="label">Your name or firm</span><input id="fromName" class="input text" type="text" autocomplete="organization" placeholder="Studio Rao Architects"></label>
+					<label class="field"><span class="label">Your phone <small>optional</small></span><input id="fromPhone" class="input text" type="tel" autocomplete="tel" placeholder="98400 00000"></label>
+					<label class="field"><span class="label">Client's name</span><input id="toName" class="input text" type="text" autocomplete="off" placeholder="Mr and Mrs Sharma"></label>
+					<label class="field"><span class="label">Project or site</span><input id="project" class="input text" type="text" autocomplete="off" placeholder="Residence at Anna Nagar"></label>
+				</div>
+				<details class="more" id="note-wrap">
+					<summary>Add a note for the client</summary>
+					<textarea id="note" class="input text area" rows="3" maxlength="400" placeholder="Includes three design options and up to 12 site visits."></textarea>
+				</details>
+				<div class="send-actions">
+					<button type="button" class="btn primary" id="pdf"><span>Download PDF proposal</span></button>
+					<button type="button" class="btn wa" id="share">WhatsApp</button>
+					<button type="button" class="btn" id="copy">Copy text</button>
+				</div>
+				<p class="sub" id="send-hint" hidden>Enter the project cost first.</p>
+			</section>
+		</aside>
+	</div>
+
+	<section class="block" id="stages-sec" hidden>
+		<h2>When you get paid</h2>
+		<p class="sub">COA's indicative schedule of payments, applied to your fee.</p>
+		<div class="table-wrap glass">
+			<table class="stages">
+				<thead><tr><th>Stage</th><th class="r">%</th><th class="r hide-sm">Cumulative</th><th class="r">Amount</th></tr></thead>
+				<tbody id="stages"></tbody>
+				<tfoot><tr><th>Total, before GST</th><th class="r">100%</th><th class="hide-sm"></th><th class="r num" id="stages-total"></th></tr></tfoot>
+			</table>
+		</div>
+	</section>
+
+	<section class="block source">
+		<h2>Where the numbers come from</h2>
+		<ul id="notes"></ul>
+		<p class="sub">COA rates: Council of Architecture, India, <i>Manual of Architectural Practice</i>, Vol. 4, §4.8.1, Tables 1–4; payment stages §4.3.2. All 368 percentages checked against COA's published PDF on 21 Nov 2026. Experience and city premiums are ArchXchange's market guidance, not COA rules. Confirm against the current COA scale before you sign a contract.</p>
+	</section>
+</main>
+
+<div class="dock" id="dock" hidden>
+	<div><span class="k">Your fee</span><b class="num" id="dock-fee"></b><span class="dock-tag" id="dock-tag"></span></div>
+	<button type="button" class="btn" id="dock-go">Details</button>
+	<button type="button" class="btn primary" id="dock-send">Send</button>
+</div>
+
+<!-- The one-page proposal: filled in by app.js, turned into a PDF or printed. -->
+<div class="sheet-host" aria-hidden="true"><div class="sheet" id="sheet"></div></div>
+
+<script src="coa-data.js"></script>
+<script src="market.js"></script>
+<script src="fee-calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -22,7 +22,7 @@ git push
 | `app.js` | Reads the form, draws the result, share / copy / print | Change what the page shows |
 | `index.html` | The page and its questions | Change wording, add a field, change the premium buttons |
 | `style.css` | Look and layout (phone first; two columns from 960px) | Change the design |
-| `test.js` | 24 checks on the data and the maths | Add a check when you change the maths |
+| `test.js` | 27 checks on the data and the maths | Add a check when you change the maths |
 
 Run the checks after any change to `coa-data.js` or `fee-calc.js`:
 
@@ -49,6 +49,12 @@ node test.js
 - **Architecture + Interiors** = Table 2 on the construction cost + Table 3 (Interior Design) on the fit-out cost. Each part uses its own slab, because COA prices Table 3 on "the gross construction cost of the respective discipline".
 - **Repeated identical blocks** use COA's tiers, read as in the fee workbook: repeats 1–3 at 50% each, 4–6 at 30%, beyond 6 at 20%. They apply to Tables 1 and 2.
 - **Missing percentages:** where COA prints "–" (for example a house above ₹99.9 Cr), the page shows a warning instead of a fee.
+- **Payment stages:**
+  - The page starts with COA's 15 stages (§4.3.2).
+  - "Customise stages" opens an editor where you can rename stages, change the %, add or remove stages, or start again from COA.
+  - Stages save only when each one has a name and a % above 0 and they total 100%. The last stage takes the rounding, so the amounts add up exactly to the fee.
+  - Custom stages are saved on the device and used on the PDF and in the WhatsApp text. "Use COA stages" switches back.
+  - Custom stages change only how the fee is split, never the fee.
 
 ## Send to your client
 

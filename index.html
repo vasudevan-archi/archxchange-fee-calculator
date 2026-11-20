@@ -184,14 +184,36 @@
 	</div>
 
 	<section class="block" id="stages-sec" hidden>
-		<h2>When you get paid</h2>
-		<p class="sub">COA's indicative schedule of payments, applied to your fee.</p>
-		<div class="table-wrap glass">
+		<div class="block-head">
+			<div>
+				<h2>When you get paid</h2>
+				<p class="sub" id="stages-sub">COA's indicative schedule of payments, applied to your fee.</p>
+			</div>
+			<div class="stage-btns">
+				<button type="button" class="btn" id="stages-edit">Customise stages</button>
+				<button type="button" class="btn ghost-btn" id="stages-coa" hidden>Use COA stages</button>
+			</div>
+		</div>
+
+		<div class="table-wrap glass" id="stages-view">
 			<table class="stages">
 				<thead><tr><th>Stage</th><th class="r">%</th><th class="r hide-sm">Cumulative</th><th class="r">Amount</th></tr></thead>
 				<tbody id="stages"></tbody>
-				<tfoot><tr><th>Total, before GST</th><th class="r">100%</th><th class="hide-sm"></th><th class="r num" id="stages-total"></th></tr></tfoot>
+				<tfoot><tr><th>Total, before GST</th><th class="r" id="stages-pct">100%</th><th class="hide-sm"></th><th class="r num" id="stages-total"></th></tr></tfoot>
 			</table>
+		</div>
+
+		<div class="glass editor" id="stage-editor" hidden>
+			<p class="sub">Rename, change the %, add or remove stages. They must add up to 100%. Your stages are saved on this device.</p>
+			<div class="ed-head" aria-hidden="true"><span>Stage</span><span>%</span><span class="hide-sm">Amount</span><span></span></div>
+			<ol class="ed-rows" id="stage-rows"></ol>
+			<div class="ed-foot">
+				<button type="button" class="btn" id="stage-add">+ Add stage</button>
+				<button type="button" class="btn" id="stage-reset">Start again from COA</button>
+				<span class="ed-total" id="stage-total"></span>
+			</div>
+			<p class="error" id="stage-problems" hidden></p>
+			<button type="button" class="btn primary block-btn" id="stage-done">Save these stages</button>
 		</div>
 	</section>
 

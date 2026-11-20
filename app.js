@@ -7,6 +7,20 @@
 	const form = $("form");
 	const STORE = "ax.feeCalculator.v2";
 
+	// Custom payment stages: null means COA's stages. Saved per device, only once they total 100%.
+	const STAGE_STORE = "ax.feeCalculator.stages.v1";
+	let customStages = null, editing = false, draft = [];
+	try {
+		const s = JSON.parse(localStorage.getItem(STAGE_STORE) || "null");
+		if (Array.isArray(s) && window.AXFee.checkStages(s).ok) customStages = s;
+	} catch (_e) { /* storage unavailable */ }
+	function saveStages() {
+		try {
+			if (customStages) localStorage.setItem(STAGE_STORE, JSON.stringify(customStages));
+			else localStorage.removeItem(STAGE_STORE);
+		} catch (_e) { /* storage unavailable */ }
+	}
+
 	const inr = (n) => "₹" + Math.round(n).toLocaleString("en-IN");
 	const short = (n) => {
 		const v = Number(n) || 0;
@@ -70,6 +84,7 @@
 			area: area, buildCost: cost("buildRate", "buildTotal"), interiorCost: cost("interiorRate", "interiorTotal"),
 			experience: radio("experience"), city: radio("city"), premiumPct: Number($("premium").value) || 0,
 			repeats: Number($("repeats").value) || 0, gstRate: $("gst").checked ? 0.18 : 0,
+			stages: customStages,
 		};
 		// What you charge today, turned into ₹ for this project.
 		const cur = Number($("current").value) || 0;
@@ -188,7 +203,14 @@
 
 		$("stages").innerHTML = r.stages.map((s) =>
 			"<tr><td>" + esc(s.name) + '</td><td class="r num">' + s.pct + '%</td><td class="r num hide-sm">' + s.cumulative + '%</td><td class="r num">' + inr(s.amount) + "</td></tr>").join("");
-		$("stages-total").textContent = inr(r.fee);
+		$("stages-total").textContent = inr(r.stages.reduce((a, s) => a + s.amount, 0));
+		$("stages-pct").textContent = (Math.round(r.stagesCheck.total * 100) / 100) + "%";
+		$("stages-sub").textContent = r.customStages ? "Your own stages, applied to your fee. They appear on the PDF and the WhatsApp message."
+			: "COA's indicative schedule of payments, applied to your fee.";
+		$("stages-coa").hidden = !r.customStages || editing;
+		$("stages-edit").textContent = r.customStages ? "Edit stages" : "Customise stages";
+		$("stages-edit").hidden = editing;
+		if (editing) editorTotals();
 		$("dock-fee").textContent = inr(r.fee);
 		const tag = r.compare ? { belowCoa: "You: below COA", belowPeers: "You: undercharging", inLine: "You: in line", above: "You: above peers" }[r.compare.status] : "";
 		$("dock-tag").textContent = tag;
@@ -227,9 +249,14 @@
 			"Scope: " + scopeLine(r), "",
 			"Professional fee: " + inr(r.fee)];
 		if (r.gstRate) m.push("GST 18%: " + inr(r.gst));
-		m.push("*Total: " + inr(r.total) + "*", "",
-			"Payable in COA stages: 10% on signing the agreement, then through concept, schematic design, approvals, design development, construction documents, tender, construction and close-out.",
-			"The fee follows the Council of Architecture scale of fees.");
+		m.push("*Total: " + inr(r.total) + "*", "");
+		if (r.customStages) {
+			m.push("Payable in stages:");
+			r.stages.forEach((s) => m.push("• " + s.name + " (" + s.pct + "%): " + inr(s.amount)));
+		} else {
+			m.push("Payable in COA stages: 10% on signing the agreement, then through concept, schematic design, approvals, design development, construction documents, tender, construction and close-out.");
+		}
+		m.push("The fee follows the Council of Architecture scale of fees.");
 		if (note) m.push("", note);
 		if (from || phone) m.push("", "Regards,", from, phone);
 		if (BRANDING) m.push("", "_Prepared with ArchXchange_");
@@ -303,6 +330,77 @@
 		if (!render.last || !navigator.clipboard) return;
 		navigator.clipboard.writeText(message()).then(() => { b.textContent = "Copied"; setTimeout(() => { b.textContent = "Copy text"; }, 2000); }, () => {});
 	});
+	/* ---------- Custom payment stages ---------- */
+	function openEditor() {
+		draft = (customStages || COA.stages).map((s) => ({ name: s.name, pct: s.pct }));
+		editing = true;
+		$("stages-view").hidden = true;
+		$("stage-editor").hidden = false;
+		$("stage-problems").hidden = true;
+		drawRows();
+		render();
+	}
+	function closeEditor() {
+		editing = false;
+		$("stages-view").hidden = false;
+		$("stage-editor").hidden = true;
+		render();
+	}
+	function drawRows() {
+		$("stage-rows").innerHTML = draft.map((s, i) =>
+			'<li data-i="' + i + '"><input class="input text ed-name" aria-label="Stage ' + (i + 1) + ' name" value="' + esc(s.name) + '">' +
+			'<span class="input-wrap ed-pctw"><input class="input ed-pct" type="number" inputmode="decimal" min="0" max="100" step="any" aria-label="Stage ' + (i + 1) + ' %" value="' + s.pct + '"><em>%</em></span>' +
+			'<span class="ed-amt num hide-sm"></span>' +
+			'<button type="button" class="ed-del" aria-label="Remove stage ' + (i + 1) + '">×</button></li>').join("");
+		editorTotals();
+	}
+	function editorTotals() {
+		const fee = render.last ? render.last.fee : 0;
+		const c = AXFee.checkStages(draft);
+		const amounts = AXFee.stageAmounts(fee, draft);
+		$("stage-rows").querySelectorAll(".ed-amt").forEach((el, i) => { el.textContent = fee ? inr(amounts[i].amount) : ""; });
+		const t = Math.round(c.total * 100) / 100;
+		$("stage-total").textContent = "Total " + t + "%" + (Math.abs(c.total - 100) < 0.001 ? "" : " · " + (c.total < 100 ? (Math.round((100 - c.total) * 100) / 100) + "% to go" : (Math.round((c.total - 100) * 100) / 100) + "% too much"));
+		$("stage-total").className = "ed-total " + (Math.abs(c.total - 100) < 0.001 ? "ok" : "bad");
+	}
+	$("stage-rows").addEventListener("input", (e) => {
+		const li = e.target.closest("li");
+		if (!li) return;
+		const s = draft[Number(li.dataset.i)];
+		if (e.target.classList.contains("ed-name")) s.name = e.target.value;
+		else s.pct = Number(e.target.value) || 0;
+		$("stage-problems").hidden = true;
+		editorTotals();
+	});
+	$("stage-rows").addEventListener("click", (e) => {
+		if (!e.target.classList.contains("ed-del")) return;
+		draft.splice(Number(e.target.closest("li").dataset.i), 1);
+		drawRows();
+	});
+	$("stage-add").addEventListener("click", () => {
+		const left = Math.max(0, Math.round((100 - AXFee.checkStages(draft).total) * 100) / 100);
+		draft.push({ name: "", pct: left });
+		drawRows();
+		const names = $("stage-rows").querySelectorAll(".ed-name");
+		names[names.length - 1].focus();
+	});
+	$("stage-reset").addEventListener("click", () => { draft = COA.stages.map((s) => ({ name: s.name, pct: s.pct })); drawRows(); });
+	$("stage-done").addEventListener("click", () => {
+		draft.forEach((s) => { s.name = String(s.name).trim(); });
+		const c = AXFee.checkStages(draft);
+		if (!c.ok) {
+			$("stage-problems").innerHTML = c.problems.map(esc).join("<br>");
+			$("stage-problems").hidden = false;
+			return;
+		}
+		const sameAsCoa = draft.length === COA.stages.length && draft.every((s, i) => s.name === COA.stages[i].name && s.pct === COA.stages[i].pct);
+		customStages = sameAsCoa ? null : draft.map((s) => ({ name: s.name, pct: s.pct }));
+		saveStages();
+		closeEditor();
+	});
+	$("stages-edit").addEventListener("click", openEditor);
+	$("stages-coa").addEventListener("click", () => { customStages = null; saveStages(); render(); });
+
 	const go = (id) => $(id).scrollIntoView({ behavior: "smooth", block: "start" });
 	$("dock-go").addEventListener("click", () => go("result"));
 	$("dock-send").addEventListener("click", () => go("send"));

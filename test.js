@@ -138,6 +138,29 @@ test("Your rate: ₹9,00,000 is above COA but ₹31,845 below peers; ₹9,50,000
 	assert.strictEqual(calculate(Object.assign({ currentTotal: 1000000 }, base)).compare.status, "above");
 });
 
+console.log("Custom payment stages");
+test("Custom stages 20/30/30/20 on ₹9,52,102.50 split to the rupee and add up to ₹9,52,103", () => {
+	const stages = [{ name: "Advance", pct: 20 }, { name: "Design", pct: 30 }, { name: "Drawings", pct: 30 }, { name: "Site", pct: 20 }];
+	const r = calculate(Object.assign({ experience: "mid", city: "metro", stages: stages }, villa));
+	assert.ok(r.customStages && r.stagesCheck.ok);
+	assert.deepStrictEqual(r.stages.map((s) => s.amount), [190421, 285631, 285631, 190420]);
+	assert.strictEqual(r.stages.reduce((a, s) => a + s.amount, 0), 952103);
+	assert.strictEqual(r.stages[3].cumulative, 100);
+});
+test("Custom stages that total 95%, or have no name or 0%, are flagged; the fee itself is unchanged", () => {
+	const r = calculate(Object.assign({ experience: "mid", city: "metro", stages: [{ name: "Advance", pct: 45 }, { name: "Rest", pct: 50 }] }, villa));
+	assert.ok(!r.stagesCheck.ok);
+	assert.ok(/95%/.test(r.stagesCheck.problems.join(" ")));
+	near(r.fee, 952102.5);
+	assert.ok(!calculate(Object.assign({ stages: [{ name: "", pct: 100 }] }, villa)).stagesCheck.ok);
+	assert.ok(!calculate(Object.assign({ stages: [{ name: "A", pct: 100 }, { name: "B", pct: 0 }] }, villa)).stagesCheck.ok);
+});
+test("No custom stages means COA's 15 stages", () => {
+	const r = calculate(villa);
+	assert.ok(!r.customStages);
+	assert.strictEqual(r.stages.length, 15);
+});
+
 test("Stage amounts add up exactly to the rounded fee", () => {
 	const r = calculate({ service: "archInt", category: "1b", complexity: "complex", buildCost: 12345678, interiorCost: 3456789, premiumPct: 7 });
 	assert.strictEqual(r.stages.reduce((a, s) => a + s.amount, 0), Math.round(r.fee));

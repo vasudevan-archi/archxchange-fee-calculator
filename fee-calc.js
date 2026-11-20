@@ -58,16 +58,32 @@
 		};
 	}
 
-	/** Splits a rounded total over COA's stages; the last stage takes the rounding difference. */
-	function stageAmounts(total) {
+	/** Splits a rounded total over the stages (COA's by default); when they total 100%, the last stage
+	 *  takes the rounding difference so the amounts add up exactly to the fee. */
+	function stageAmounts(total, stages) {
+		const list = stages || COA.stages;
+		const sum = list.reduce(function (a, s) { return a + (Number(s.pct) || 0); }, 0);
+		const exact = Math.abs(sum - 100) < 0.001;
 		const rounded = Math.round(total);
 		let cum = 0, paid = 0;
-		return COA.stages.map(function (s, i, all) {
-			cum += s.pct;
-			const amount = i === all.length - 1 ? rounded - paid : Math.round(total * s.pct / 100);
+		return list.map(function (s, i, all) {
+			const p = Number(s.pct) || 0;
+			cum += p;
+			const amount = exact && i === all.length - 1 ? rounded - paid : Math.round(total * p / 100);
 			paid += amount;
-			return { name: s.name, group: s.group, pct: s.pct, cumulative: cum, amount: amount };
+			return { name: s.name, group: s.group, pct: p, cumulative: Math.round(cum * 100) / 100, amount: amount };
 		});
+	}
+
+	/** Checks custom stages: each needs a name and a % above 0, and together they must make 100%. */
+	function checkStages(stages) {
+		const total = stages.reduce(function (a, s) { return a + (Number(s.pct) || 0); }, 0);
+		const problems = [];
+		if (!stages.length) problems.push("Add at least one stage.");
+		if (stages.some(function (s) { return !String(s.name || "").trim(); })) problems.push("Give every stage a name.");
+		if (stages.some(function (s) { return !(Number(s.pct) > 0); })) problems.push("Give every stage a % above 0.");
+		if (Math.abs(total - 100) >= 0.001) problems.push("Your stages add up to " + (Math.round(total * 100) / 100) + "%. Make them 100%.");
+		return { total: total, ok: !problems.length, problems: problems };
 	}
 
 	/**
@@ -79,6 +95,7 @@
 	 *   buildCost    ₹ gross construction cost (arch, comp, archInt); also the discipline / master-plan cost
 	 *   interiorCost ₹ interior fit-out cost (archInt, interior)
 	 *   repeats      repeated identical blocks (Tables 1, 2 only), default 0
+	 *   stages       optional custom payment stages [{ name, pct }]; COA's 15 stages when left out
 	 *   experience   MARKET.experience id, or "custom" to use premiumPct
 	 *   city         MARKET.cities id
 	 *   premiumPct   with experience "custom": your premium above COA, %, never below 0
@@ -145,6 +162,8 @@
 		const gstRate = x.gstRate == null ? 0.18 : Math.max(0, Number(x.gstRate) || 0);
 		const gst = fee * gstRate;
 		const area = Number(x.area) > 0 ? Number(x.area) : 0;
+		const custom_stages = Array.isArray(x.stages) && x.stages.length > 0;
+		const stagesCheck = custom_stages ? checkStages(x.stages) : { total: 100, ok: true, problems: [] };
 
 		// What you charge now, against COA and your peers.
 		const current = Number(x.currentTotal) > 0 ? Number(x.currentTotal) : 0;
@@ -167,11 +186,13 @@
 			feePctOfCost: cost ? 100 * fee / cost : 0, coaPctOfCost: cost ? 100 * coaFee / cost : 0,
 			area: area, perSqft: area ? fee / area : 0, coaPerSqft: area ? coaFee / area : 0,
 			compare: compare,
-			stages: stageAmounts(fee),
+			customStages: custom_stages,
+			stagesCheck: stagesCheck,
+			stages: stageAmounts(fee, custom_stages ? x.stages : null),
 		};
 	}
 
-	const api = { SERVICES: SERVICES, COA: COA, MARKET: MARKET, calculate: calculate, slabIndex: slabIndex, repetitionFactor: repetitionFactor, stageAmounts: stageAmounts };
+	const api = { SERVICES: SERVICES, COA: COA, MARKET: MARKET, calculate: calculate, slabIndex: slabIndex, repetitionFactor: repetitionFactor, stageAmounts: stageAmounts, checkStages: checkStages };
 	if (typeof module !== "undefined" && module.exports) module.exports = api;
 	else root.AXFee = api;
 })(this);

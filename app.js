@@ -140,29 +140,38 @@
 		const c = r.compare;
 		if (!c) return "";
 		const peers = peersText(r);
-		const you = inr(c.current) + (c.perSqft ? " (" + inr(c.perSqft) + "/sq.ft)" : "");
+		const underCoa = c.current < r.coaFee * 0.995;
+		// [tone, badge, title, big figure, caption, action label, action amount, note]
 		const T = {
-			belowCoa: ["bad", "Below COA", "You're charging below the COA minimum",
-				"At " + you + " you are " + inr(c.shortOfCoa) + " under the COA fee for this project, which is " + pctShort(c.pctOfCoa) + " of COA. " +
-				capital(who(r)) + " charge " + peers + ". Quote at least " + inr(Math.min(r.coaFee, r.peer.low)) + "."],
-			belowPeers: ["warn", "Undercharging", "Above COA, but below your peers",
-				capital(who(r)) + " charge " + peers + " for this project. At " + you + " you're leaving " + inr(c.shortOfPeers) + " on the table."],
-			inLine: ["ok", "In line", "You're in line with your peers",
-				capital(who(r)) + " charge " + peers + ". You're at " + you + "." +
-				(c.current < r.coaFee * 0.995 ? " That is " + inr(c.shortOfCoa) + " under COA, which is fine while you start out. Move up to " + inr(r.coaFee) + " as your work grows." : "")],
-			above: ["ok", "Above peers", "You charge more than most of your peers",
-				capital(who(r)) + " charge " + peers + ". At " + you + " you're above that: fine when your work and service justify it."],
+			belowCoa: ["bad", "Below COA", "You're charging below the COA minimum", inr(c.shortOfCoa), "short of the COA minimum on this project",
+				"Quote at least", inr(Math.min(r.coaFee, r.peer.low)), capital(who(r)) + " charge " + peers + ". You're at " + pctShort(c.pctOfCoa) + " of COA."],
+			belowPeers: ["warn", "Undercharging", "Above COA, but below your peers", inr(c.shortOfPeers), "left on the table against your peers",
+				"Match your peers", inr(r.fee), capital(who(r)) + " charge " + peers + "."],
+			inLine: ["ok", "In line", "You're in line with your peers", pctShort(c.pctOfCoa), "of COA, right where architects like you are",
+				underCoa ? "Aim for COA" : "", underCoa ? inr(r.coaFee) : "",
+				capital(who(r)) + " charge " + peers + "." + (underCoa ? " Being " + inr(c.shortOfCoa) + " under COA is fine while you start out." : "")],
+			above: ["ok", "Above peers", "You charge more than most of your peers", "+" + inr(c.current - r.peer.high), "above what your peers charge",
+				"", "", capital(who(r)) + " charge " + peers + ". Charging more is fine when your work and service justify it."],
 		}[c.status];
-		const lo = Math.min(c.current, r.coaFee) * 0.9, hi = Math.max(c.current, r.peer.high) * 1.08;
-		const at = (v) => Math.max(0, Math.min(100, 100 * (v - lo) / (hi - lo))).toFixed(1) + "%";
-		return '<div class="verdict ' + T[0] + '"><span class="badge">' + T[1] + "</span><b>" + T[2] + "</b></div>" +
-			"<p>" + esc(T[3]) + "</p>" +
-			'<div class="meter" aria-hidden="true">' +
-			'<span class="band" style="left:' + at(r.peer.low) + ";width:calc(" + at(r.peer.high) + " - " + at(r.peer.low) + ')"></span>' +
-			'<span class="mark coa" style="left:' + at(r.coaFee) + '"><i>COA</i></span>' +
-			'<span class="mark you ' + T[0] + '" style="left:' + at(c.current) + '"><i>You</i></span>' +
+		const max = Math.max(c.current, r.coaFee, r.peer.high);
+		const w = (v) => Math.max(3, 100 * v / max).toFixed(1) + "%";
+		const sq = (v) => r.area ? "<small>" + inr(v / r.area) + "/sq.ft</small>" : "";
+		const bar = (label, fill, value, sub) =>
+			'<div class="rc-row"><span class="rc-l">' + label + '</span><span class="rc-track" aria-hidden="true">' + fill + "</span>" +
+			'<span class="rc-v num"><b>' + value + "</b>" + sub + "</span></div>";
+		const peerFill = same(r) ? '<i class="rc-fill rc-peers" style="width:' + w(r.peer.high) + '"></i>'
+			: '<i class="rc-fill rc-peers" style="width:' + w(r.peer.high) + '"><i class="rc-range" style="left:' + (100 * r.peer.low / r.peer.high).toFixed(1) + '%"></i></i>';
+		return '<div class="rc ' + T[0] + '">' +
+			'<span class="badge">' + T[1] + "</span>" +
+			'<h3 class="rc-title">' + T[2] + "</h3>" +
+			'<div class="rc-big"><b class="num">' + esc(T[3]) + "</b><span>" + esc(T[4]) + "</span></div>" +
+			'<div class="rc-bars">' +
+			bar("You", '<i class="rc-fill rc-you" style="width:' + w(c.current) + '"></i>', inr(c.current), sq(c.current)) +
+			bar("COA", '<i class="rc-fill rc-coa" style="width:' + w(r.coaFee) + '"></i>', inr(r.coaFee), sq(r.coaFee)) +
+			bar("Peers", peerFill, inr(r.peer.high), same(r) ? sq(r.peer.low) : "<small>from " + inr(r.peer.low) + "</small>") +
 			"</div>" +
-			'<div class="meter-key"><span><i class="kc"></i>COA ' + inr(r.coaFee) + '</span><span><i class="kp"></i>Peers ' + peers + "</span></div>";
+			(T[5] ? '<p class="rc-act"><span>' + esc(T[5]) + '</span><b class="num">' + T[6] + "</b></p>" : "") +
+			'<p class="rc-note">' + esc(T[7]) + "</p></div>";
 	}
 	const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 

@@ -1,8 +1,8 @@
 /* ArchXchange fee calculation. Pure functions, no page code, so `node test.js` can check them.
  *
  *   COA fee   = gross construction cost × COA % (table, category or discipline, complexity, cost slab)
- *   Your fee  = COA fee × (1 + experience premium + city premium), from market.js; every premium ≥ 0,
- *               so COA is the minimum and is never discounted
+ *   Your fee  = COA fee × (1 + experience premium + city premium), from market.js. Starting out may
+ *               sit up to 10% below COA (and never above it); every other level is at COA or above
  *   Peers     = the same with the low and high end of the experience range
  *   Client pays = your fee + GST (18%)
  *
@@ -10,6 +10,7 @@
  *   arch       Architecture only               Table 2 on the construction cost
  *   comp       Comprehensive                   Table 1 on the construction cost
  *   archInt    Architecture + Interiors        Table 2 on the construction cost + Table 3 (Interior) on the fit-out cost
+ *   compInt    Comprehensive + Interiors       Table 1 on the construction cost + Table 3 (Interior) on the fit-out cost
  *   interior   Interior design only            Table 3 (Interior) on the fit-out cost
  *   discipline Lighting / Landscape / Conservation  Table 3 on the cost of that discipline's work
  *   master     Master planning                 Table 4 on the gross execution cost of the master plan works
@@ -24,6 +25,7 @@
 		{ id: "arch", name: "Architecture only", hint: "Design, drawings, approvals and site visits. Engineering consultants paid separately.", parts: ["build"] },
 		{ id: "comp", name: "Comprehensive", hint: "Architecture with structural, MEPF and liaison under your fee.", parts: ["build"] },
 		{ id: "archInt", name: "Architecture + Interiors", hint: "Architecture on the building cost, plus interior design on the fit-out cost.", parts: ["build", "interior"] },
+		{ id: "compInt", name: "Comprehensive + Interiors", hint: "Architecture, structure, MEPF and liaison, plus interior design on the fit-out cost.", parts: ["build", "interior"] },
 		{ id: "interior", name: "Interior design only", hint: "Interior design on the fit-out cost.", parts: ["interior"] },
 		{ id: "discipline", name: "Lighting, landscape or conservation", hint: "A specialist consultancy, on the cost of that work.", parts: ["discipline"] },
 		{ id: "master", name: "Master planning", hint: "Layouts, levels, roads, drainage and infrastructure for a master plan.", parts: ["master"] },
@@ -98,7 +100,7 @@
 	 *   stages       optional custom payment stages [{ name, pct }]; COA's 15 stages when left out
 	 *   experience   MARKET.experience id, or "custom" to use premiumPct
 	 *   city         MARKET.cities id
-	 *   premiumPct   with experience "custom": your premium above COA, %, never below 0
+	 *   premiumPct   with experience "custom": your premium above COA, %, never below 0 (only starting out may go below COA)
 	 *   currentTotal what you charge now for this project, ₹ before GST (optional)
 	 *   gstRate      default 0.18; 0 to leave GST out
 	 *   area         built-up sq.ft, optional, only for ₹ per sq.ft
@@ -112,14 +114,14 @@
 		const interior = Number(x.interiorCost) || 0;
 		const lines = [];
 
-		if (svc.id === "arch" || svc.id === "comp" || svc.id === "archInt") {
-			const tableId = svc.id === "comp" ? "T1" : "T2";
+		if (svc.id === "arch" || svc.id === "comp" || svc.id === "archInt" || svc.id === "compInt") {
+			const tableId = svc.id === "comp" || svc.id === "compInt" ? "T1" : "T2";
 			const cat = COA.categories.find(function (c) { return c.id === x.category; });
 			if (!cat) errors.push("Choose the building category.");
 			else if (!(build > 0)) errors.push("Enter the construction cost.");
 			else lines.push(line("Architecture", tableId, cat.name, COA.rates[tableId][cat.id], "building", build, cx));
 		}
-		if (svc.id === "archInt" || svc.id === "interior") {
+		if (svc.id === "archInt" || svc.id === "compInt" || svc.id === "interior") {
 			if (!(interior > 0)) errors.push("Enter the interior fit-out cost.");
 			else lines.push(line("Interiors", "T3", "Interior Design", COA.rates.T3.interior, "discipline", interior, cx));
 		}
@@ -146,14 +148,16 @@
 		const cost = lines.reduce(function (a, l) { return a + l.cost; }, 0);
 		const coaFee = lines.reduce(function (a, l) { return a + l.feeAfterRepetition; }, 0);
 
-		// Premium on top of COA: experience (a range) plus city. Never negative, so never below COA.
+		// Premium on COA: experience (a range) plus city. Only a level with cityPremium: false (starting out)
+		// may go below COA, by at most 10%; "Set my own" and every other level stay at COA or above.
 		const exp = MARKET.experience.find(function (e) { return e.id === x.experience; });
 		const city = MARKET.cities.find(function (c) { return c.id === x.city; }) || MARKET.cities[MARKET.cities.length - 1];
 		const custom = Math.max(0, Number(x.premiumPct) || 0);
 		const expRange = exp ? exp.premium : [custom, custom];
-		const cityPct = Math.max(0, city.premium);
-		const lowPct = Math.max(0, expRange[0]) + cityPct;
-		const highPct = Math.max(0, expRange[1]) + cityPct;
+		const floor = exp && exp.cityPremium === false ? -10 : 0;
+		const cityPct = exp && exp.cityPremium === false ? 0 : Math.max(0, city.premium);
+		const lowPct = Math.max(floor, expRange[0]) + cityPct;
+		const highPct = Math.max(floor, expRange[1]) + cityPct;
 		const premiumPct = (lowPct + highPct) / 2;
 		const fee = coaFee * (1 + premiumPct / 100);
 		const peerLow = coaFee * (1 + lowPct / 100);
@@ -169,7 +173,8 @@
 		const current = Number(x.currentTotal) > 0 ? Number(x.currentTotal) : 0;
 		let compare = null;
 		if (current) {
-			const status = current < coaFee * 0.995 ? "belowCoa" : current < peerLow * 0.995 ? "belowPeers" : current <= peerHigh * 1.005 ? "inLine" : "above";
+			// Within your level's range is "in line", even where starting out sits below COA.
+			const status = current < peerLow * 0.995 ? (current < coaFee * 0.995 ? "belowCoa" : "belowPeers") : current <= peerHigh * 1.005 ? "inLine" : "above";
 			compare = {
 				status: status, current: current, pctOfCoa: 100 * current / coaFee,
 				shortOfCoa: Math.max(0, coaFee - current), shortOfPeers: Math.max(0, peerLow - current), shortOfFee: Math.max(0, fee - current),

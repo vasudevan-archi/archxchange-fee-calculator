@@ -30,6 +30,11 @@
 	};
 	const pct = (n) => Number(n).toFixed(2) + "%";
 	const pctShort = (n) => (Math.round(n * 10) / 10).toLocaleString("en-IN") + "%";
+	const signed = (n) => (n < 0 ? "−" : "+") + pctShort(Math.abs(n));
+	const vsCoa = (n) => Math.abs(n) < 0.05 ? "At COA" : "COA " + signed(n).replace(/^([+−])/, "$1 ");
+	const rangeTag = (lo, hi) => lo === hi ? (lo ? signed(lo) : "at COA") : (lo ? signed(lo) : "COA") + " to " + (hi ? signed(hi) : "COA");
+	const same = (r) => Math.abs(r.peer.high - r.peer.low) < 1;
+	const peersText = (r) => same(r) ? inr(r.peer.low) : inr(r.peer.low) + " – " + inr(r.peer.high);
 	const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 	const radio = (name) => (form.querySelector('input[name="' + name + '"]:checked') || {}).value;
 	const option = (name, value, checked, title, body, tag) =>
@@ -41,7 +46,7 @@
 	$("category").innerHTML = COA.categories.map((c) => '<option value="' + c.id + '"' + (c.id === "1b" ? " selected" : "") + ">" + esc(c.name) + "</option>").join("");
 	$("discipline").innerHTML = COA.disciplines.filter((d) => d.id !== "interior").map((d) => '<option value="' + d.id + '">' + esc(d.name) + "</option>").join("");
 	$("experience").innerHTML = MARKET.experience.map((e) =>
-		option("experience", e.id, e.id === "mid", e.name, e.years + " · " + e.who, "+" + e.premium[0] + "–" + e.premium[1] + "%")).join("") +
+		option("experience", e.id, e.id === "mid", e.name, e.years + " · " + e.who, rangeTag(e.premium[0], e.premium[1]))).join("") +
 		option("experience", "custom", false, "Set my own", "Your own premium above COA", "custom");
 	$("cities").innerHTML = MARKET.cities.map((c) =>
 		option("city", c.id, c.id === "metro", c.name, c.eg, c.premium ? "+" + c.premium + "%" : "at COA")).join("");
@@ -128,22 +133,23 @@
 			(l.rowRates[i] == null ? "–" : l.rowRates[i].toFixed(2)) + "</b></td>").join("") + "</tr></table>";
 	}
 	function who(r) {
-		const lvl = r.experience ? r.experience.name.toLowerCase() + " architects" : "architects charging your premium";
+		const lvl = !r.experience ? "architects charging your premium" : r.experience.id === "starting" ? "architects starting out" : r.experience.name.toLowerCase() + " architects";
 		return lvl + (r.cityPct || r.city.id !== "tier3" ? " in a " + r.city.name.toLowerCase() : " in tier 3 cities and towns");
 	}
 	function compareBox(r) {
 		const c = r.compare;
 		if (!c) return "";
-		const peers = inr(r.peer.low) + "–" + inr(r.peer.high);
+		const peers = peersText(r);
 		const you = inr(c.current) + (c.perSqft ? " (" + inr(c.perSqft) + "/sq.ft)" : "");
 		const T = {
 			belowCoa: ["bad", "Below COA", "You're charging below the COA minimum",
 				"At " + you + " you are " + inr(c.shortOfCoa) + " under the COA fee for this project, which is " + pctShort(c.pctOfCoa) + " of COA. " +
-				capital(who(r)) + " charge " + peers + ". Quote at least " + inr(r.coaFee) + "."],
+				capital(who(r)) + " charge " + peers + ". Quote at least " + inr(Math.min(r.coaFee, r.peer.low)) + "."],
 			belowPeers: ["warn", "Undercharging", "Above COA, but below your peers",
 				capital(who(r)) + " charge " + peers + " for this project. At " + you + " you're leaving " + inr(c.shortOfPeers) + " on the table."],
 			inLine: ["ok", "In line", "You're in line with your peers",
-				capital(who(r)) + " charge " + peers + ". You're at " + you + "."],
+				capital(who(r)) + " charge " + peers + ". You're at " + you + "." +
+				(c.current < r.coaFee * 0.995 ? " That is " + inr(c.shortOfCoa) + " under COA, which is fine while you start out. Move up to " + inr(r.coaFee) + " as your work grows." : "")],
 			above: ["ok", "Above peers", "You charge more than most of your peers",
 				capital(who(r)) + " charge " + peers + ". At " + you + " you're above that: fine when your work and service justify it."],
 		}[c.status];
@@ -163,6 +169,7 @@
 	function render() {
 		const x = read();
 		layout(x);
+		drawCategory();
 		const r = calculate(x);
 		const ok = r.errors && !r.errors.length;
 		const hasCost = x.buildCost > 0 || x.interiorCost > 0;
@@ -178,9 +185,9 @@
 		if (!ok) return;
 
 		$("fee").textContent = inr(r.fee);
-		$("fee-sub").innerHTML = "COA + " + pctShort(r.premiumPct) + (r.area ? " · <b>" + inr(r.perSqft) + "</b> per sq.ft" : "") + " · " + pct(r.feePctOfCost) + " of cost";
-		$("peers").innerHTML = '<span class="k">' + esc(capital(who(r))) + ' charge</span><b class="num">' + inr(r.peer.low) + " – " + inr(r.peer.high) + "</b>" +
-			(r.area ? '<small class="num">' + inr(r.peer.low / r.area) + " – " + inr(r.peer.high / r.area) + " per sq.ft</small>" : "");
+		$("fee-sub").innerHTML = vsCoa(r.premiumPct) + (r.area ? " · <b>" + inr(r.perSqft) + "</b> per sq.ft" : "") + " · " + pct(r.feePctOfCost) + " of cost";
+		$("peers").innerHTML = '<span class="k">' + esc(capital(who(r))) + ' charge</span><b class="num">' + peersText(r) + "</b>" +
+			(r.area ? '<small class="num">' + inr(r.peer.low / r.area) + (same(r) ? "" : " – " + inr(r.peer.high / r.area)) + " per sq.ft</small>" : "");
 		$("compare").hidden = !r.compare;
 		$("compare").innerHTML = compareBox(r);
 
@@ -188,14 +195,14 @@
 		$("lines").innerHTML = r.lines.map((l) =>
 			'<div class="line">' +
 			'<p class="line-head"><b>' + esc(l.part) + "</b> · " + esc(l.table.split(" (")[0]) + "</p>" +
-			'<p class="line-meta">' + esc(l.row) + " · " + (l.complexity === "simple" ? "Simple" : "Complex") + " · " + esc(l.slab) + " slab</p>" +
+			'<p class="line-meta">' + esc(l.row) + (matched && (l.tableId === "T1" || l.tableId === "T2") ? " (" + esc(matched.coaType) + ")" : "") + " · " + (l.complexity === "simple" ? "Simple" : "Complex") + " · " + esc(l.slab) + " slab</p>" +
 			slabTable(l) +
 			'<p class="calc num">' + pct(l.pct) + " × " + inr(l.cost) + " = <b>" + inr(l.coaFee) + "</b></p>" +
 			(l.repetitionFactor !== 1 ? '<p class="calc num">× ' + l.repetitionFactor.toFixed(4) + " for " + r.repeats + " repeated block" + (r.repeats === 1 ? "" : "s") + " = <b>" + inr(l.feeAfterRepetition) + "</b></p>" : "") +
 			"</div>").join("");
 
 		const rows = [["COA minimum fee", inr(r.coaFee)]];
-		rows.push(["Experience and city <small>+" + pctShort(r.premiumPct) + " on COA</small>", "+ " + inr(r.premium)]);
+		rows.push(["Experience and city <small>" + (Math.abs(r.premiumPct) < 0.05 ? "at COA" : signed(r.premiumPct) + " on COA") + "</small>", (r.premium < 0 ? "− " : "+ ") + inr(Math.abs(r.premium))]);
 		rows.push(["Your fee", inr(r.fee), "fee"]);
 		if (r.gstRate) rows.push(["GST, 18%", inr(r.gst)]);
 		rows.push(["Client pays", inr(r.total), "total"]);
@@ -256,7 +263,7 @@
 		} else {
 			m.push("Payable in COA stages: 10% on signing the agreement, then through concept, schematic design, approvals, design development, construction documents, tender, construction and close-out.");
 		}
-		m.push("The fee follows the Council of Architecture scale of fees.");
+		m.push("The fee is based on the Council of Architecture scale of fees.");
 		if (note) m.push("", note);
 		if (from || phone) m.push("", "Regards,", from, phone);
 		if (BRANDING) m.push("", "_Prepared with ArchXchange_");
@@ -282,7 +289,7 @@
 			'<tr class="tot"><td>Total payable</td><td class="r">' + inr(r.total) + "</td></tr></table>" +
 			'<p class="sh-basis">Basis: Council of Architecture scale of fees, <i>Manual of Architectural Practice</i>, Vol. 4.<br>' + basis +
 			(r.repeats ? "<br>Adjusted for " + r.repeats + " repeated block" + (r.repeats === 1 ? "" : "s") + " as per COA." : "") +
-			"<br>This fee is not below the COA minimum fee of " + inr(r.coaFee) + " for this project.</p>" +
+			(r.fee >= r.coaFee - 0.5 ? "<br>This fee is not below the COA minimum fee of " + inr(r.coaFee) + " for this project." : "") + "</p>" +
 			'<h3>Schedule of payments</h3><div class="sh-stages"><table>' + stageRows(r.stages.slice(0, half)) + "</table><table>" + stageRows(r.stages.slice(half)) + "</table></div>" +
 			(note ? '<h3>Notes</h3><p class="sh-note">' + esc(note) + "</p>" : "") +
 			'<p class="sh-terms">Fees are exclusive of GST unless shown. The construction cost excludes land, statutory and approval fees, and other consultants\' fees unless stated. Construction-stage fees are payable in instalments with progress. This proposal is valid for 30 days.</p>' +
@@ -400,6 +407,59 @@
 	});
 	$("stages-edit").addEventListener("click", openEditor);
 	$("stages-coa").addEventListener("click", () => { customStages = null; saveStages(); render(); });
+
+	/* ---------- Step 02: find the COA category for a building type ---------- */
+	const B = window.AXBuildings;
+	const catName = (id) => (COA.categories.find((c) => c.id === id) || {}).name || "";
+	let matched = null; // the COA building type picked from the search, e.g. "Banquet Halls"
+	function drawCategory() {
+		const id = $("category").value;
+		if (matched && matched.category !== id) matched = null;
+		$("cat-types").innerHTML = "COA includes: " + (B.TYPES[id] || []).map((t) => matched && t === matched.coaType ? "<b>" + esc(t) + "</b>" : esc(t)).join(", ");
+		$("cat-panel").innerHTML = '<p class="sub">COA Vol. 4, §4.5.1. Tap one to use it.</p>' + COA.categories.map((c) =>
+			'<button type="button" class="cat-item' + (c.id === id ? " on" : "") + '" data-cat="' + c.id + '">' + esc(c.name) + "<small>" + esc((B.TYPES[c.id] || []).join(" · ")) + "</small></button>").join("");
+	}
+	function pickCategory(id) {
+		$("category").value = id;
+		render();
+	}
+	let hits = [];
+	function drawHits() {
+		const q = $("bsearch").value.trim();
+		hits = B.searchBuilding(q, 6);
+		$("bhits").hidden = q.length < 2;
+		$("bhits").innerHTML = hits.length ? hits.map((h, i) =>
+			'<li><button type="button" data-i="' + i + '">' + esc(h.coaType) + "<small>" + esc(catName(h.category)) + (h.said ? " · for “" + esc(h.said) + "”" : "") + "</small></button></li>").join("")
+			: '<li class="none">Not in COA\'s lists. Pick the closest category below, or tap <b>i</b> to see what each one includes.</li>';
+	}
+	function pickHit(h) {
+		matched = h;
+		$("bsearch").value = h.said ? h.said.charAt(0).toUpperCase() + h.said.slice(1) : h.coaType;
+		$("bhits").hidden = true;
+		pickCategory(h.category);
+	}
+	$("bsearch").addEventListener("input", drawHits);
+	$("bsearch").addEventListener("keydown", (e) => {
+		if (e.key === "Enter") { e.preventDefault(); if (hits[0]) pickHit(hits[0]); }
+		if (e.key === "Escape") $("bhits").hidden = true;
+	});
+	$("bhits").addEventListener("click", (e) => {
+		const b = e.target.closest("button");
+		if (b) pickHit(hits[Number(b.dataset.i)]);
+	});
+	$("cat-info").addEventListener("click", (e) => {
+		const open = $("cat-panel").hidden;
+		$("cat-panel").hidden = !open;
+		e.currentTarget.setAttribute("aria-expanded", String(open));
+	});
+	$("cat-panel").addEventListener("click", (e) => {
+		const b = e.target.closest(".cat-item");
+		if (!b) return;
+		matched = null;
+		$("cat-panel").hidden = true;
+		$("cat-info").setAttribute("aria-expanded", "false");
+		pickCategory(b.dataset.cat);
+	});
 
 	const go = (id) => $(id).scrollIntoView({ behavior: "smooth", block: "start" });
 	$("dock-go").addEventListener("click", () => go("result"));

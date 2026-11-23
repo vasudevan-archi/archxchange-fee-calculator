@@ -31,8 +31,8 @@
 
 <main class="wrap">
 	<section class="hero">
-		<h1>Price your work.<br><span class="grad">Never below COA.</span></h1>
-		<p>Your fee starts from the Council of Architecture minimum, read straight from the COA scale. Then we add what architects at your level, in your city, really charge, and tell you if you're undercharging.</p>
+		<h1>Price your work.<br><span class="grad">Start from COA.</span></h1>
+		<p>Your fee starts from the Council of Architecture minimum, read straight from the COA scale. Starting out, you can stay up to 10% under it; from mid-level on, you charge COA or more, plus your city. We show what architects like you charge, and tell you if you're undercharging.</p>
 		<ol class="how">
 			<li><b>Calculate</b> your fee in seven quick answers</li>
 			<li><b>Check your rate</b> against COA and your peers</li>
@@ -49,7 +49,18 @@
 
 			<section class="step" id="q-category">
 				<h2><span class="n">02</span>Building <small>COA Tables 1 & 2</small></h2>
-				<select id="category" class="select"></select>
+				<label class="field">
+					<span class="label">What are you designing?</span>
+					<span class="input-wrap"><em aria-hidden="true">⌕</em><input id="bsearch" class="input text" type="search" placeholder="e.g. marriage hall, school, villa" autocomplete="off" enterkeyhint="search" aria-controls="bhits"></span>
+				</label>
+				<ul class="hits" id="bhits" hidden></ul>
+				<span class="label cat-label">COA category</span>
+				<div class="cat-row">
+					<select id="category" class="select" aria-label="COA building category"></select>
+					<button type="button" class="info-btn" id="cat-info" aria-expanded="false" aria-controls="cat-panel" title="What each category includes">i</button>
+				</div>
+				<p class="cat-types" id="cat-types"></p>
+				<div class="cat-panel" id="cat-panel" hidden></div>
 			</section>
 
 			<section class="step" id="q-discipline" hidden>
@@ -235,6 +246,7 @@
 
 <script src="coa-data.js"></script>
 <script src="market.js"></script>
+<script src="building-types.js"></script>
 <script src="fee-calc.js"></script>
 <script src="app.js"></script>
 </body>
